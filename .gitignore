@@ -192,3 +192,30 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Ignorar entorno virtual
+venv/
+ENV/
+env/
+
+# Archivos grandes y binarios de modelos
+*.pkl
+*.joblib
+*.h5
+
+# Cachés de Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Configuraciones del sistema y editores
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Archivos temporales
+*.log
+*.bak
+*.tmp
