@@ -27,7 +27,7 @@ holistic = mp_holistic.Holistic(
     min_detection_confidence=0.5,
     min_tracking_confidence=0.5
 )
-EXPECTED_FEATURES = 543 * 3
+EXPECTED_FEATURES = (33+21+21) * 3
 
 # Carga modelo y encoder global
 
@@ -46,7 +46,7 @@ def extract_landmarks(frames):
         features = []
         for lm_list, count in [
             (res.pose_landmarks.landmark if res.pose_landmarks else [], 33),
-            (res.face_landmarks.landmark if res.face_landmarks else [], 468),
+            #(res.face_landmarks.landmark if res.face_landmarks else [], 468),
             (res.left_hand_landmarks.landmark if res.left_hand_landmarks else [], 21),
             (res.right_hand_landmarks.landmark if res.right_hand_landmarks else [], 21)
         ]:
