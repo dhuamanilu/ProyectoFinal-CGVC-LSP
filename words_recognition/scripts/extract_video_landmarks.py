@@ -34,14 +34,6 @@ def extract_landmarks_from_video(video_path):
             # Añadir ceros si no se detecta pose (33 landmarks * 3 coords = 99 features)
             current_frame_features.extend(np.zeros(33 * 3).tolist())
 
-        # Extraer landmarks de Face
-        if results.face_landmarks:
-            for lm in results.face_landmarks.landmark:
-                current_frame_features.extend([lm.x, lm.y, lm.z]) # MediaPipe FaceMesh también tiene Z
-        else:
-            # Añadir ceros si no se detecta rostro (468 landmarks * 3 coords = 1404 features)
-            current_frame_features.extend(np.zeros(468 * 3).tolist())
-
         # Extraer landmarks de Mano Izquierda
         if results.left_hand_landmarks:
             for lm in results.left_hand_landmarks.landmark:
@@ -60,7 +52,7 @@ def extract_landmarks_from_video(video_path):
         
         # Validar el número total de características (33+468+21+21 = 543 landmarks * 3 coords = 1629)
         # Esto asegura consistencia en la longitud de las secuencias de características.
-        expected_features = 543 * 3 
+        expected_features = (33+21+21) * 3 
         if len(current_frame_features) == expected_features:
             frame_landmarks.append(current_frame_features)
         else:
