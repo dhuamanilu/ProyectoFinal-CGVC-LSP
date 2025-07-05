@@ -219,3 +219,16 @@ Thumbs.db
 *.log
 *.bak
 *.tmp
+
+
+# no versiones raw de video ni datos procesados
+/words_recognition/data/raw/
+/words_recognition/data/augmented/
+/words_recognition/data/processed/
+
+# en tu proyecto de letras
+/letters_recognition/dataset/
+
+# ignorar archivos binarios grandes
+*.mp4
+*.pkl
