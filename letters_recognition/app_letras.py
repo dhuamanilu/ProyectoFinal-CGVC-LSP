@@ -11,9 +11,9 @@ import joblib
 import time
 import os
 import random
-
-model = joblib.load('modelo_letras.pkl')
-label_encoder = joblib.load('labels_encoder.pkl')
+from letters_recognition.config import  MODEL_PATH, ENCODER_PATH , DATASET_DIR
+model = joblib.load(MODEL_PATH)
+label_encoder = joblib.load(ENCODER_PATH)
 
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
@@ -34,7 +34,7 @@ class LSPApp:
         self.captura = None
         self.running = False
         self.modo_entrenamiento = False
-        self.dataset_path = "dataset"
+        self.dataset_path = DATASET_DIR
         self.frame_actual = None
 
         self._build_main_ui()

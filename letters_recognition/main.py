@@ -9,7 +9,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import classification_report, confusion_matrix
 import joblib
-
+from letters_recognition.config import DATASET_DIR, MODEL_PATH, ENCODER_PATH
 # ======== Inicializar MediaPipe Hands ========
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(static_image_mode=True,
@@ -56,15 +56,17 @@ def train_model(X, y):
 
     return clf, le
 
-# ======== Guardar modelo ========
-def save_model(model, label_encoder, model_path='modelo_letras.pkl', label_path='labels_encoder.pkl'):
+def save_model(model, label_encoder,
+              model_path=MODEL_PATH, label_path=ENCODER_PATH):
+   # crea directorio si no existe
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)
     joblib.dump(model, model_path)
     joblib.dump(label_encoder, label_path)
     print(f"Modelo y etiquetas guardados en {model_path} y {label_path}")
 
 # ======== Ejecutar ========
 if __name__ == '__main__':
-    dataset_path = 'dataset'
+    dataset_path = DATASET_DIR
     print("Cargando imágenes y extrayendo landmarks con MediaPipe...")
     X, y = load_data_with_landmarks(dataset_path)
     print(f"Total de muestras válidas: {len(X)}")
