@@ -513,6 +513,230 @@ class GameModeWindow:
         self.top.destroy()
         self.parent.root.deiconify()
 
+class HangmanModeWindow:
+    CAM_W, CAM_H = 420, 320
+    MAX_ERRORS = 10
+    PALETTE = {
+        "primary": "#4285f4", "secondary": "#34a853",
+        "danger": "#ea4335", "warning": "#ff9f0a",
+        "gray": "#6c757d", "bg": "#ffffff",
+        "light_bg": "#f8f9fa", "border": "#e9ecef"
+    }
+    WORD_LIST = ["B","PERRO", "GATO", "CASA", "AMIGO", "FAMILIA", "PYTHON", "AHORCADO"]
+
+    def __init__(self, parent):
+        self.parent = parent
+        self.errors = 0
+        self.guessed = set()
+        self.word = ""
+        self.frame_actual = None
+        self.running = False
+
+        self.top = tk.Toplevel(parent.root)
+        self.top.title("Modo Ahorcado - LSP")
+        self.top.geometry("900x680")
+        self.top.resizable(False, False)
+        self.top.configure(bg=self.PALETTE["bg"])
+        self.top.protocol("WM_DELETE_WINDOW", self.close)
+
+        self._build_ui()
+        self.reset_game()
+
+    def _build_ui(self):
+        # Header
+        hdr = tk.Frame(self.top, bg=self.PALETTE["primary"], height=60)
+        hdr.pack(fill="x")
+        hdr.pack_propagate(False)
+        tk.Label(hdr, text="🔤 Modo Ahorcado",
+                 font=("Arial", 18, "bold"), bg=self.PALETTE["primary"],
+                 fg="white").pack(pady=15)
+
+        # Main content
+        content = tk.Frame(self.top, bg=self.PALETTE["bg"])
+        content.pack(expand=True, fill="both", padx=15, pady=15)
+
+        # Left: cámara y control
+        left = tk.Frame(content, bg=self.PALETTE["bg"])
+        left.pack(side="left", fill="both", expand=True, padx=(0,10))
+        cam_fr = tk.Frame(left, width=self.CAM_W, height=self.CAM_H,
+                          bg=self.PALETTE["border"], bd=2, relief="solid")
+        cam_fr.pack(pady=5)
+        cam_fr.pack_propagate(False)
+        self.canvas = tk.Canvas(cam_fr, width=self.CAM_W, height=self.CAM_H,
+                                bg=self.PALETTE["light_bg"])
+        self.canvas.pack()
+        self._show_cam_placeholder()
+        btns = tk.Frame(left, bg=self.PALETTE["bg"])
+        btns.pack(pady=10)
+        self.btn_cam = tk.Button(btns, text="Iniciar Cámara",
+                                 bg=self.PALETTE["primary"], fg="white",
+                                 font=("Arial",11,"bold"),
+                                 command=self.toggle_camera)
+        self.btn_cam.pack(side="left", padx=5)
+        tk.Button(btns, text="Reconocer Letra",
+                  bg=self.PALETTE["warning"], fg="white",
+                  font=("Arial",11,"bold"),
+                  command=self.recognize_letter).pack(side="left", padx=5)
+
+        # Right: estado del juego
+        right = tk.Frame(content, width=300, bg=self.PALETTE["bg"])
+        right.pack(side="right", fill="y")
+        right.pack_propagate(False)
+
+        # Palabra y guiones
+        pf = tk.LabelFrame(right, text="Palabra", font=("Arial",12,"bold"),
+                           bg=self.PALETTE["bg"])
+        pf.pack(fill="x", pady=5)
+        self.lbl_word = tk.Label(pf, text="", font=("Arial",24,"bold"),
+                                 bg=self.PALETTE["light_bg"], width=15, height=2,
+                                 relief="solid", bd=1)
+        self.lbl_word.pack(padx=10,pady=10)
+
+        # Letras intentadas
+        lf = tk.LabelFrame(right, text="Letras Intentadas",
+                           font=("Arial",12,"bold"), bg=self.PALETTE["bg"])
+        lf.pack(fill="x", pady=5)
+        self.lbl_tried = tk.Label(lf, text="", font=("Arial",14),
+                                  bg=self.PALETTE["light_bg"], height=2,
+                                  wraplength=280, justify="left")
+        self.lbl_tried.pack(padx=10,pady=10)
+
+        # Ahorcado (canvas de dibujo)
+        hf = tk.LabelFrame(right, text="Ahorcado",
+                           font=("Arial",12,"bold"), bg=self.PALETTE["bg"])
+        hf.pack(fill="both", expand=True, pady=5)
+        self.hang_canvas = tk.Canvas(hf, width=200, height=240,
+                                     bg=self.PALETTE["light_bg"])
+        self.hang_canvas.pack(padx=10,pady=10)
+
+        # Controles inferiores
+        ctrls = tk.Frame(self.top, bg=self.PALETTE["bg"])
+        ctrls.pack(fill="x", pady=(0,10))
+        tk.Button(ctrls, text="Reiniciar", bg=self.PALETTE["secondary"],
+                  fg="white", font=("Arial",11,"bold"),
+                  command=self.reset_game).pack(side="left", expand=True, fill="x", padx=5)
+        tk.Button(ctrls, text="Volver", bg=self.PALETTE["danger"],
+                  fg="white", font=("Arial",11,"bold"),
+                  command=self.close).pack(side="left", expand=True, fill="x", padx=5)
+
+    def _show_cam_placeholder(self):
+        self.canvas.delete("all")
+        self.canvas.create_rectangle(0,0,self.CAM_W,self.CAM_H,
+                                     fill=self.PALETTE["light_bg"], outline="")
+        self.canvas.create_text(self.CAM_W//2, self.CAM_H//2,
+                                text="📷 Cámara lista\nHaz clic en 'Iniciar Cámara'",
+                                font=("Arial",12), fill=self.PALETTE["gray"],
+                                justify="center")
+
+    def toggle_camera(self):
+        if not self.running:
+            self.running = True
+            self.btn_cam.config(text="Detener Cámara")
+            self.canvas.delete("all")
+            self.canvas.create_text(self.CAM_W//2,self.CAM_H//2,
+                                    text="🔄 Cargando cámara...",
+                                    font=("Arial",12),fill=self.PALETTE["gray"])
+            self.cap = cv2.VideoCapture(0)
+            threading.Thread(target=self._update_frame, daemon=True).start()
+        else:
+            self.running = False
+            self.btn_cam.config(text="Iniciar Cámara")
+            if hasattr(self, 'cap') and self.cap:
+                self.cap.release()
+            self._show_cam_placeholder()
+
+    def _update_frame(self):
+        while self.running:
+            ret, frame = self.cap.read()
+            if not ret:
+                continue
+            frame = cv2.flip(frame,1)
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = hands.process(rgb)
+            if results.multi_hand_landmarks:
+                for lm in results.multi_hand_landmarks:
+                    mp_drawing.draw_landmarks(frame, lm, mp_hands.HAND_CONNECTIONS)
+            img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            img = img.resize((self.CAM_W,self.CAM_H))
+            imgtk = ImageTk.PhotoImage(img)
+            self.canvas.create_image(0,0,anchor="nw",image=imgtk)
+            self.canvas.imgtk = imgtk
+            self.frame_actual = frame.copy()
+        if hasattr(self, 'cap') and self.cap:
+            self.cap.release()
+        self._show_cam_placeholder()
+
+    def reset_game(self):
+        self.errors = 0
+        self.guessed.clear()
+        self.word = random.choice(self.WORD_LIST)
+        self._update_word_display()
+        self._update_tried()
+        self._draw_hangman()
+
+    def _update_word_display(self):
+        disp = " ".join([c if c in self.guessed else "_" for c in self.word])
+        self.lbl_word.config(text=disp)
+
+    def _update_tried(self):
+        self.lbl_tried.config(text=" ".join(sorted(self.guessed)))
+
+    def _draw_hangman(self):
+        self.hang_canvas.delete("all")
+        parts = [
+            lambda c: c.create_line(20,220,180,220),        # suelo
+            lambda c: c.create_line(50,220,50,20),          # poste vertical
+            lambda c: c.create_line(50,20,140,20),          # viga horizontal
+            lambda c: c.create_line(140,20,140,50),         # cuerda
+            lambda c: c.create_oval(120,50,160,90),         # cabeza
+            lambda c: c.create_line(140,90,140,150),        # cuerpo
+            lambda c: c.create_line(140,110,120,130),       # brazo izq
+            lambda c: c.create_line(140,110,160,130),       # brazo der
+            lambda c: c.create_line(140,150,120,180),       # pierna izq
+            lambda c: c.create_line(140,150,160,180),       # pierna der
+        ]
+        # dibujar según número de errores (hasta MAX_ERRORS)
+        for i in range(min(self.errors, self.MAX_ERRORS)):
+            parts[i](self.hang_canvas)
+
+    def recognize_letter(self):
+        if not hasattr(self, "frame_actual") or self.frame_actual is None:
+            return
+        rgb = cv2.cvtColor(self.frame_actual, cv2.COLOR_BGR2RGB)
+        results = hands.process(rgb)
+        if not results.multi_hand_landmarks:
+            messagebox.showinfo("Sin mano", "No se detectó mano. Intenta de nuevo.")
+            return
+        for lm in results.multi_hand_landmarks:
+            coords = [coord for lm in results.multi_hand_landmarks[0].landmark for coord in (lm.x, lm.y)]
+            if len(coords) != 42:
+                continue
+            X = np.array(coords).reshape(1, -1)
+            pred = model.predict(X)[0]
+            letter = label_encoder.inverse_transform([pred])[0].upper()
+            if letter in self.guessed:
+                messagebox.showinfo("Letra repetida", f"Ya probaste '{letter}'.")
+                return
+            self.guessed.add(letter)
+            if letter in self.word:
+                self._update_word_display()
+                if all(c in self.guessed for c in self.word):
+                    messagebox.showinfo("¡Ganaste!", f"¡Felicidades! La palabra era '{self.word}'.")
+            else:
+                self.errors += 1
+                self._draw_hangman()
+                if self.errors >= self.MAX_ERRORS:
+                    messagebox.showinfo("Perdiste", f"Se acabó el juego. La palabra era '{self.word}'.")
+            self._update_tried()
+            return
+
+    def close(self):
+        self.running = False
+        if hasattr(self, 'cap') and self.cap:
+            self.cap.release()
+        self.top.destroy()
+        self.parent.root.deiconify()
+
 class TrainingModeWindow:
     CAM_WIDTH = 420
     CAM_HEIGHT = 320
@@ -919,6 +1143,18 @@ class LSPApp:
         tk.Button(mode_frame, text="🎮 Modo Juego", bg=self.PALETTE["secondary"], fg="white",
                  font=("Arial", 12, "bold"), command=self.abrir_modo_juego).pack(fill="x", padx=10, pady=5)
         
+        # Dentro de LSPApp._build_main_ui(), en el frame de modos:
+        btn_hang = tk.Button(
+            mode_frame,
+            text="🔤 Modo Ahorcado",
+            bg=self.PALETTE["primary"],
+            fg="white",
+            font=("Arial", 12, "bold"),
+            command=self.abrir_modo_ahorcado
+        )
+        btn_hang.pack(fill="x", padx=10, pady=5)
+
+        
         # Status bar
         self.estado = tk.Label(self.root, text="✅ Sistema listo - Selecciona un modo o inicia la cámara", 
                               anchor=tk.W, bg=self.PALETTE["light_bg"], relief="sunken",
@@ -1016,6 +1252,11 @@ class LSPApp:
     def abrir_modo_juego(self):
         self.root.withdraw()
         GameModeWindow(self)
+    
+    def abrir_modo_ahorcado(self):
+        self.root.withdraw()
+        HangmanModeWindow(self)
+
 
 def main():
     def start_main_app():
